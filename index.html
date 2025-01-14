@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bearbeitbarer Kalender</title>
+    <title>Kalender</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -17,6 +17,29 @@
         h1 {
             margin: 20px;
         }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 90%;
+            max-width: 800px;
+            margin-bottom: 10px;
+        }
+        .calendar-header button {
+            padding: 5px 15px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .calendar-header button:hover {
+            background-color: #1769aa;
+        }
+        .calendar-header span {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
         .calendar {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -25,22 +48,36 @@
             width: 90%;
             max-width: 800px;
         }
-        .day {
+        .day, .weekday {
             background-color: #fff;
             padding: 10px;
             text-align: center;
             border: 1px solid #ccc;
-            height: 100px;
             position: relative;
+        }
+        .weekday {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        .day {
+            height: auto;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: flex-start;
         }
         .day span {
             font-weight: bold;
         }
+        .events-container {
+            margin-top: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            width: 100%;
+        }
         .event {
-            position: absolute;
-            bottom: 5px;
-            left: 5px;
-            right: 5px;
             background: #2196F3;
             color: #fff;
             padding: 3px;
@@ -63,8 +100,9 @@
             z-index: 1000;
             border-radius: 8px;
         }
-        #eventModal input, #eventModal button {
+        #eventModal input, #eventModal select, #eventModal button {
             margin-top: 10px;
+            display: block;
         }
         #modalBackdrop {
             display: none;
@@ -80,13 +118,25 @@
 </head>
 <body>
 
-<h1>Bearbeitbarer Kalender</h1>
+<h1>Kalender</h1>
+<div class="calendar-header">
+    <button id="prevMonth">← Vorheriger Monat</button>
+    <span id="currentMonth"></span>
+    <button id="nextMonth">Nächster Monat →</button>
+</div>
 <div class="calendar" id="calendar"></div>
 
 <div id="modalBackdrop"></div>
 <div id="eventModal">
-    <h2>Termin hinzufügen</h2>
+    <h2>Termin hinzufügen/bearbeiten</h2>
     <input type="text" id="eventTitle" placeholder="Titel des Termins" />
+    <label for="eventColor">Farbe:</label>
+    <select id="eventColor">
+        <option value="#2196F3" style="color: #2196F3;">Blau</option>
+        <option value="#F44336" style="color: #F44336;">Rot</option>
+        <option value="#4CAF50" style="color: #4CAF50;">Grün</option>
+        <option value="#FF9800" style="color: #FF9800;">Orange</option>
+    </select>
     <button id="saveEvent">Speichern</button>
     <button id="cancelEvent">Abbrechen</button>
 </div>
@@ -96,63 +146,111 @@
     const modal = document.getElementById('eventModal');
     const backdrop = document.getElementById('modalBackdrop');
     const eventTitleInput = document.getElementById('eventTitle');
+    const eventColorSelect = document.getElementById('eventColor');
     const saveEventButton = document.getElementById('saveEvent');
     const cancelEventButton = document.getElementById('cancelEvent');
+    const currentMonthSpan = document.getElementById('currentMonth');
+    const prevMonthButton = document.getElementById('prevMonth');
+    const nextMonthButton = document.getElementById('nextMonth');
 
     let selectedDay = null;
+    let currentYear = 2025;
+    let currentMonth = 0; // Januar
+    const months = [
+        "Januar", "Februar", "März", "April", "Mai", "Juni",
+        "Juli", "August", "September", "Oktober", "November", "Dezember"
+    ];
+    const weekdays = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
-    // Generiere den Kalender (Januar 2025 als Beispiel)
+    function updateCalendarHeader() {
+        currentMonthSpan.textContent = `${months[currentMonth]} ${currentYear}`;
+    }
+
     function generateCalendar() {
-        const daysInMonth = 31; // Für Januar
-        const startDay = 3; // 1. Januar 2025 ist ein Donnerstag
+        calendar.innerHTML = '';
+        // Wochentage hinzufügen
+        weekdays.forEach(day => {
+            const weekdayElement = document.createElement('div');
+            weekdayElement.className = 'weekday';
+            weekdayElement.textContent = day;
+            calendar.appendChild(weekdayElement);
+        });
+
+        // Tage des Monats hinzufügen
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const startDay = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7; // Montag als erster Tag der Woche
+
         for (let i = 0; i < startDay; i++) {
-            calendar.appendChild(document.createElement('div')); // Leere Felder
+            calendar.appendChild(document.createElement('div'));
         }
         for (let day = 1; day <= daysInMonth; day++) {
             const dayElement = document.createElement('div');
             dayElement.className = 'day';
-            dayElement.innerHTML = `<span>${day}</span>`;
+            dayElement.innerHTML = `<span>${day}</span><div class="events-container"></div>`;
             dayElement.addEventListener('click', () => openModal(dayElement));
             calendar.appendChild(dayElement);
         }
     }
 
-    // Öffnet das Modal
     function openModal(dayElement) {
-        selectedDay = dayElement;
+        selectedDay = dayElement.querySelector('.events-container');
         eventTitleInput.value = '';
         modal.style.display = 'block';
         backdrop.style.display = 'block';
     }
 
-    // Schließt das Modal
     function closeModal() {
         modal.style.display = 'none';
         backdrop.style.display = 'none';
     }
 
-    // Speichert einen Termin
     function saveEvent() {
         const eventTitle = eventTitleInput.value.trim();
+        const eventColor = eventColorSelect.value;
         if (eventTitle) {
             const eventElement = document.createElement('div');
             eventElement.className = 'event';
             eventElement.textContent = eventTitle;
+            eventElement.style.backgroundColor = eventColor;
             eventElement.addEventListener('click', (e) => {
                 e.stopPropagation();
-                alert(`Termin: ${eventTitle}`);
+                const deleteEvent = confirm(`Möchten Sie den Termin "${eventTitle}" löschen?`);
+                if (deleteEvent) {
+                    eventElement.remove();
+                }
             });
             selectedDay.appendChild(eventElement);
         }
         closeModal();
     }
 
-    // Event Listener für Buttons
     saveEventButton.addEventListener('click', saveEvent);
     cancelEventButton.addEventListener('click', closeModal);
     backdrop.addEventListener('click', closeModal);
 
-    // Kalender generieren
+    prevMonthButton.addEventListener('click', () => {
+        if (currentMonth === 0) {
+            currentMonth = 11;
+            currentYear--;
+        } else {
+            currentMonth--;
+        }
+        updateCalendarHeader();
+        generateCalendar();
+    });
+
+    nextMonthButton.addEventListener('click', () => {
+        if (currentMonth === 11) {
+            currentMonth = 0;
+            currentYear++;
+        } else {
+            currentMonth++;
+        }
+        updateCalendarHeader();
+        generateCalendar();
+    });
+
+    updateCalendarHeader();
     generateCalendar();
 </script>
 
