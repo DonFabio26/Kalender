@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kalender</title>
+    <title>Bearbeitbarer Kalender</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -118,7 +118,7 @@
 </head>
 <body>
 
-<h1>Kalender</h1>
+<h1>Bearbeitbarer Kalender</h1>
 <div class="calendar-header">
     <button id="prevMonth">← Vorheriger Monat</button>
     <span id="currentMonth"></span>
@@ -130,6 +130,10 @@
 <div id="eventModal">
     <h2>Termin hinzufügen/bearbeiten</h2>
     <input type="text" id="eventTitle" placeholder="Titel des Termins" />
+    <label for="eventStartTime">Von:</label>
+    <input type="time" id="eventStartTime" />
+    <label for="eventEndTime">Bis:</label>
+    <input type="time" id="eventEndTime" />
     <label for="eventColor">Farbe:</label>
     <select id="eventColor">
         <option value="#2196F3" style="color: #2196F3;">Blau</option>
@@ -146,6 +150,8 @@
     const modal = document.getElementById('eventModal');
     const backdrop = document.getElementById('modalBackdrop');
     const eventTitleInput = document.getElementById('eventTitle');
+    const eventStartTimeInput = document.getElementById('eventStartTime');
+    const eventEndTimeInput = document.getElementById('eventEndTime');
     const eventColorSelect = document.getElementById('eventColor');
     const saveEventButton = document.getElementById('saveEvent');
     const cancelEventButton = document.getElementById('cancelEvent');
@@ -168,7 +174,6 @@
 
     function generateCalendar() {
         calendar.innerHTML = '';
-        // Wochentage hinzufügen
         weekdays.forEach(day => {
             const weekdayElement = document.createElement('div');
             weekdayElement.className = 'weekday';
@@ -176,9 +181,8 @@
             calendar.appendChild(weekdayElement);
         });
 
-        // Tage des Monats hinzufügen
         const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        const startDay = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7; // Montag als erster Tag der Woche
+        const startDay = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
 
         for (let i = 0; i < startDay; i++) {
             calendar.appendChild(document.createElement('div'));
@@ -195,6 +199,8 @@
     function openModal(dayElement) {
         selectedDay = dayElement.querySelector('.events-container');
         eventTitleInput.value = '';
+        eventStartTimeInput.value = '';
+        eventEndTimeInput.value = '';
         modal.style.display = 'block';
         backdrop.style.display = 'block';
     }
@@ -206,11 +212,14 @@
 
     function saveEvent() {
         const eventTitle = eventTitleInput.value.trim();
+        const eventStartTime = eventStartTimeInput.value.trim();
+        const eventEndTime = eventEndTimeInput.value.trim();
         const eventColor = eventColorSelect.value;
-        if (eventTitle) {
+
+        if (eventTitle && eventStartTime && eventEndTime) {
             const eventElement = document.createElement('div');
             eventElement.className = 'event';
-            eventElement.textContent = eventTitle;
+            eventElement.textContent = `${eventStartTime} - ${eventEndTime}: ${eventTitle}`;
             eventElement.style.backgroundColor = eventColor;
             eventElement.addEventListener('click', (e) => {
                 e.stopPropagation();
