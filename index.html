@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -125,16 +125,182 @@
             apiKey: "AIzaSyDAHyermfy978ysuXNFEmECLfYrTexTTFo",
             authDomain: "neueakte.firebaseapp.com",
             projectId: "neueakte",
-            storageBucket: "neueakte.appspot.com",
+            storageBucket: "neueakte.firebasestorage.app",
             messagingSenderId: "179230045821",
             appId: "1:179230045821:web:bbd2b5f8734f68dfd26314",
-            measurementId: "G-3MYK0CQ04E",
-            databaseURL: "https://neueakte-default-rtdb.europe-west1.firebasedatabase.app/"
+            measurementId: "G-3MYK0CQ04E"
         };
 
         // Firebase initialisieren
         const app = firebase.initializeApp(firebaseConfig);
         const database = firebase.database(app);
+
+        // Kalender Variablen
+        const calendar = document.getElementById('calendar');
+        const modal = document.getElementById('eventModal');
+        const backdrop = document.getElementById('modalBackdrop');
+        const eventTitleInput = document.getElementById('eventTitle');
+        const eventStartTimeInput = document.getElementById('eventStartTime');
+        const eventEndTimeInput = document.getElementById('eventEndTime');
+        const eventColorSelect = document.getElementById('eventColor');
+        const saveEventButton = document.getElementById('saveEvent');
+        const cancelEventButton = document.getElementById('cancelEvent');
+        const currentMonthSpan = document.getElementById('currentMonth');
+        const prevMonthButton = document.getElementById('prevMonth');
+        const nextMonthButton = document.getElementById('nextMonth');
+
+        let selectedDay = null;
+        let selectedDayDay = null;
+        let currentYear = 2025;
+        let currentMonth = 0; // Januar
+        const months = [
+            "Januar", "Februar", "März", "April", "Mai", "Juni",
+            "Juli", "August", "September", "Oktober", "November", "Dezember"
+        ];
+        const weekdays = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+
+        function updateCalendarHeader() {
+            currentMonthSpan.textContent = `${months[currentMonth]} ${currentYear}`;
+        }
+
+        function generateCalendar() {
+            calendar.innerHTML = '';
+            weekdays.forEach(day => {
+                const weekdayElement = document.createElement('div');
+                weekdayElement.className = 'weekday';
+                weekdayElement.textContent = day;
+                calendar.appendChild(weekdayElement);
+            });
+
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const startDay = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
+
+            for (let i = 0; i < startDay; i++) {
+                calendar.appendChild(document.createElement('div'));
+            }
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'day';
+                dayElement.innerHTML = `<span>${day}</span><div class="events-container"></div>`;
+                dayElement.addEventListener('click', () => openModal(dayElement, day));
+                calendar.appendChild(dayElement);
+            }
+
+            // Lade Events aus der Firebase-Datenbank
+            loadEvents();
+        }
+
+        function openModal(dayElement, day) {
+            selectedDay = dayElement.querySelector('.events-container');
+            selectedDayDay = day;
+            eventTitleInput.value = '';
+            eventStartTimeInput.value = '';
+            eventEndTimeInput.value = '';
+            modal.style.display = 'block';
+            backdrop.style.display = 'block';
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+            backdrop.style.display = 'none';
+        }
+
+        function saveEvent() {
+            const eventTitle = eventTitleInput.value.trim();
+            const eventStartTime = eventStartTimeInput.value.trim();
+            const eventEndTime = eventEndTimeInput.value.trim();
+            const eventColor = eventColorSelect.value;
+
+            if (eventTitle && eventStartTime && eventEndTime) {
+                const eventElement = document.createElement('div');
+                eventElement.className = 'event';
+                eventElement.textContent = `${eventStartTime} - ${eventEndTime}: ${eventTitle}`;
+                eventElement.style.backgroundColor = eventColor;
+                selectedDay.appendChild(eventElement);
+
+                // Termin in Firebase speichern
+                saveEventToDatabase(eventTitle, eventStartTime, eventEndTime, eventColor, selectedDayDay);
+            }
+            closeModal();
+        }
+
+        saveEventButton.addEventListener('click', saveEvent);
+        cancelEventButton.addEventListener('click', closeModal);
+        backdrop.addEventListener('click', closeModal);
+
+        prevMonthButton.addEventListener('click', () => {
+            if (currentMonth === 0) {
+                currentMonth = 11;
+                currentYear--;
+            } else {
+                currentMonth--;
+            }
+            updateCalendarHeader();
+            generateCalendar();
+        });
+
+        nextMonthButton.addEventListener('click', () => {
+            if (currentMonth === 11) {
+                currentMonth = 0;
+                currentYear++;
+            } else {
+                currentMonth++;
+            }
+            updateCalendarHeader();
+            generateCalendar();
+        });
+
+        updateCalendarHeader();
+        generateCalendar();
+
+        // Firebase-Operationen
+        function saveEventToDatabase(title, startTime, endTime, color, day) {
+            const eventId = new Date().toISOString();
+            const eventRef = database.ref('events/' + eventId);
+            eventRef.set({
+                title,
+                startTime,
+                endTime,
+                color,
+                day: day // Speichern des Tages
+            });
+        }
+
+        function loadEvents() {
+            const dayRef = database.ref('events/');
+            dayRef.once('value', snapshot => {
+                const events = snapshot.val();
+                const daysWithEvents = {};
+
+                // Gruppiere Events nach Tag
+                for (const eventId in events) {
+                    const event = events[eventId];
+                    const eventDate = new Date(event.startTime);
+                    if (eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear) {
+                        const day = eventDate.getDate();
+                        if (!daysWithEvents[day]) {
+                            daysWithEvents[day] = [];
+                        }
+                        daysWithEvents[day].push(event);
+                    }
+                }
+
+                // Füge Events zu den entsprechenden Tagen hinzu
+                const dayElements = calendar.querySelectorAll('.day');
+                dayElements.forEach((dayElement, index) => {
+                    const day = index - Math.floor((new Date(currentYear, currentMonth, 1).getDay() + 6) % 7);
+                    if (daysWithEvents[day]) {
+                        daysWithEvents[day].forEach(event => {
+                            const eventElement = document.createElement('div');
+                            eventElement.className = 'event';
+                            eventElement.textContent = `${event.startTime} - ${event.endTime}: ${event.title}`;
+                            eventElement.style.backgroundColor = event.color;
+                            dayElement.querySelector('.events-container').appendChild(eventElement);
+                        });
+                    }
+                });
+            });
+        }
     </script>
 </head>
 <body>
@@ -145,188 +311,29 @@
     <span id="currentMonth"></span>
     <button id="nextMonth">Nächster Monat →</button>
 </div>
+
 <div class="calendar" id="calendar"></div>
 
+<!-- Modal für Event hinzufügen -->
 <div id="modalBackdrop"></div>
 <div id="eventModal">
-    <h2>Termin hinzufügen/bearbeiten</h2>
-    <input type="text" id="eventTitle" placeholder="Titel des Termins" />
-    <label for="eventStartTime">Von:</label>
-    <input type="time" id="eventStartTime" />
-    <label for="eventEndTime">Bis:</label>
-    <input type="time" id="eventEndTime" />
+    <h2>Event hinzufügen</h2>
+    <label for="eventTitle">Titel:</label>
+    <input type="text" id="eventTitle">
+    <label for="eventStartTime">Startzeit:</label>
+    <input type="time" id="eventStartTime">
+    <label for="eventEndTime">Endzeit:</label>
+    <input type="time" id="eventEndTime">
     <label for="eventColor">Farbe:</label>
     <select id="eventColor">
-        <option value="#2196F3" style="color: #2196F3;">Blau</option>
-        <option value="#F44336" style="color: #F44336;">Rot</option>
-        <option value="#4CAF50" style="color: #4CAF50;">Grün</option>
-        <option value="#FF9800" style="color: #FF9800;">Orange</option>
+        <option value="#2196F3">Blau</option>
+        <option value="#4CAF50">Grün</option>
+        <option value="#FF9800">Orange</option>
+        <option value="#F44336">Rot</option>
     </select>
     <button id="saveEvent">Speichern</button>
     <button id="cancelEvent">Abbrechen</button>
 </div>
-
-<script>
-    const calendar = document.getElementById('calendar');
-    const modal = document.getElementById('eventModal');
-    const backdrop = document.getElementById('modalBackdrop');
-    const eventTitleInput = document.getElementById('eventTitle');
-    const eventStartTimeInput = document.getElementById('eventStartTime');
-    const eventEndTimeInput = document.getElementById('eventEndTime');
-    const eventColorSelect = document.getElementById('eventColor');
-    const saveEventButton = document.getElementById('saveEvent');
-    const cancelEventButton = document.getElementById('cancelEvent');
-    const currentMonthSpan = document.getElementById('currentMonth');
-    const prevMonthButton = document.getElementById('prevMonth');
-    const nextMonthButton = document.getElementById('nextMonth');
-
-    let selectedDay = null;
-    let currentYear = 2025;
-    let currentMonth = 0; // Januar
-    const months = [
-        "Januar", "Februar", "März", "April", "Mai", "Juni",
-        "Juli", "August", "September", "Oktober", "November", "Dezember"
-    ];
-    const weekdays = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
-
-    function updateCalendarHeader() {
-        currentMonthSpan.textContent = `${months[currentMonth]} ${currentYear}`;
-    }
-
-    function generateCalendar() {
-        calendar.innerHTML = '';
-        weekdays.forEach(day => {
-            const weekdayElement = document.createElement('div');
-            weekdayElement.className = 'weekday';
-            weekdayElement.textContent = day;
-            calendar.appendChild(weekdayElement);
-        });
-
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        const startDay = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
-
-        for (let i = 0; i < startDay; i++) {
-            calendar.appendChild(document.createElement('div'));
-        }
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dayElement = document.createElement('div');
-            dayElement.className = 'day';
-            dayElement.innerHTML = `<span>${day}</span><div class="events-container"></div>`;
-            dayElement.addEventListener('click', () => openModal(dayElement, day));
-            calendar.appendChild(dayElement);
-        }
-    }
-
-    function openModal(dayElement, day) {
-        selectedDay = dayElement.querySelector('.events-container');
-        eventTitleInput.value = '';
-        eventStartTimeInput.value = '';
-        eventEndTimeInput.value = '';
-        modal.style.display = 'block';
-        backdrop.style.display = 'block';
-
-        // Events für den Tag laden
-        loadEvents(day);
-    }
-
-    function closeModal() {
-        modal.style.display = 'none';
-        backdrop.style.display = 'none';
-    }
-
-    function saveEvent() {
-        const eventTitle = eventTitleInput.value.trim();
-        const eventStartTime = eventStartTimeInput.value.trim();
-        const eventEndTime = eventEndTimeInput.value.trim();
-        const eventColor = eventColorSelect.value;
-
-        if (eventTitle && eventStartTime && eventEndTime) {
-            const eventElement = document.createElement('div');
-            eventElement.className = 'event';
-            eventElement.textContent = `${eventStartTime} - ${eventEndTime}: ${eventTitle}`;
-            eventElement.style.backgroundColor = eventColor;
-            eventElement.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const deleteEvent = confirm(`Möchten Sie den Termin "${eventTitle}" löschen?`);
-                if (deleteEvent) {
-                    eventElement.remove();
-                    deleteEventFromDatabase(eventTitle); // Firebase Event löschen
-                }
-            });
-            selectedDay.appendChild(eventElement);
-
-            // Termin in Firebase speichern
-            saveEventToDatabase(eventTitle, eventStartTime, eventEndTime, eventColor);
-        }
-        closeModal();
-    }
-
-    saveEventButton.addEventListener('click', saveEvent);
-    cancelEventButton.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', closeModal);
-
-    prevMonthButton.addEventListener('click', () => {
-        if (currentMonth === 0) {
-            currentMonth = 11;
-            currentYear--;
-        } else {
-            currentMonth--;
-        }
-        updateCalendarHeader();
-        generateCalendar();
-    });
-
-    nextMonthButton.addEventListener('click', () => {
-        if (currentMonth === 11) {
-            currentMonth = 0;
-            currentYear++;
-        } else {
-            currentMonth++;
-        }
-        updateCalendarHeader();
-        generateCalendar();
-    });
-
-    updateCalendarHeader();
-    generateCalendar();
-
-    // Firebase-Operationen
-    function saveEventToDatabase(title, startTime, endTime, color) {
-        const eventId = new Date().toISOString();
-        const eventRef = database.ref('events/' + eventId);
-        eventRef.set({
-            title,
-            startTime,
-            endTime,
-            color
-        });
-    }
-
-    function loadEvents(day) {
-        const dayRef = database.ref('events/');
-        dayRef.once('value', snapshot => {
-            const events = snapshot.val();
-            selectedDay.innerHTML = ''; // Leeren der Events im Container
-            for (const eventId in events) {
-                const event = events[eventId];
-                if (new Date(event.startTime).getDate() === day) {
-                    const eventElement = document.createElement('div');
-                    eventElement.className = 'event';
-                    eventElement.textContent = `${event.startTime} - ${event.endTime}: ${event.title}`;
-                    eventElement.style.backgroundColor = event.color;
-                    selectedDay.appendChild(eventElement);
-                }
-            }
-        });
-    }
-
-    function deleteEventFromDatabase(title) {
-        const eventsRef = database.ref('events/');
-        eventsRef.orderByChild('title').equalTo(title).once('child_added', (snapshot) => {
-            snapshot.ref.remove();
-        });
-    }
-</script>
 
 </body>
 </html>
