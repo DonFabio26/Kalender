@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bearbeitbarer Kalender</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            margin: 20px;
+        }
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background-color: #ddd;
+            width: 90%;
+            max-width: 800px;
+        }
+        .day {
+            background-color: #fff;
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #ccc;
+            height: 100px;
+            position: relative;
+        }
+        .day span {
+            font-weight: bold;
+        }
+        .event {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            right: 5px;
+            background: #2196F3;
+            color: #fff;
+            padding: 3px;
+            font-size: 12px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .event:hover {
+            background: #1769aa;
+        }
+        #eventModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            border-radius: 8px;
+        }
+        #eventModal input, #eventModal button {
+            margin-top: 10px;
+        }
+        #modalBackdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Bearbeitbarer Kalender</h1>
+<div class="calendar" id="calendar"></div>
+
+<div id="modalBackdrop"></div>
+<div id="eventModal">
+    <h2>Termin hinzufügen</h2>
+    <input type="text" id="eventTitle" placeholder="Titel des Termins" />
+    <button id="saveEvent">Speichern</button>
+    <button id="cancelEvent">Abbrechen</button>
+</div>
+
+<script>
+    const calendar = document.getElementById('calendar');
+    const modal = document.getElementById('eventModal');
+    const backdrop = document.getElementById('modalBackdrop');
+    const eventTitleInput = document.getElementById('eventTitle');
+    const saveEventButton = document.getElementById('saveEvent');
+    const cancelEventButton = document.getElementById('cancelEvent');
+
+    let selectedDay = null;
+
+    // Generiere den Kalender (Januar 2025 als Beispiel)
+    function generateCalendar() {
+        const daysInMonth = 31; // Für Januar
+        const startDay = 3; // 1. Januar 2025 ist ein Donnerstag
+        for (let i = 0; i < startDay; i++) {
+            calendar.appendChild(document.createElement('div')); // Leere Felder
+        }
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayElement = document.createElement('div');
+            dayElement.className = 'day';
+            dayElement.innerHTML = `<span>${day}</span>`;
+            dayElement.addEventListener('click', () => openModal(dayElement));
+            calendar.appendChild(dayElement);
+        }
+    }
+
+    // Öffnet das Modal
+    function openModal(dayElement) {
+        selectedDay = dayElement;
+        eventTitleInput.value = '';
+        modal.style.display = 'block';
+        backdrop.style.display = 'block';
+    }
+
+    // Schließt das Modal
+    function closeModal() {
+        modal.style.display = 'none';
+        backdrop.style.display = 'none';
+    }
+
+    // Speichert einen Termin
+    function saveEvent() {
+        const eventTitle = eventTitleInput.value.trim();
+        if (eventTitle) {
+            const eventElement = document.createElement('div');
+            eventElement.className = 'event';
+            eventElement.textContent = eventTitle;
+            eventElement.addEventListener('click', (e) => {
+                e.stopPropagation();
+                alert(`Termin: ${eventTitle}`);
+            });
+            selectedDay.appendChild(eventElement);
+        }
+        closeModal();
+    }
+
+    // Event Listener für Buttons
+    saveEventButton.addEventListener('click', saveEvent);
+    cancelEventButton.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+
+    // Kalender generieren
+    generateCalendar();
+</script>
+
+</body>
+</html>
